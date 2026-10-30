@@ -1,0 +1,1 @@
+Product: AgentHub Build date: 2026-10-09 Target framework: .NET 10.0 Bundled runtime: .NET 10.0.12 Architecture: Windows x64 Startup: start.ps1

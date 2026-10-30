@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#091831">
+  <title>AgentHub · 本地协作空间</title>
+  <link rel="stylesheet" href="/styles.css?v=denim-1">
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail">
+      <div class="brand"><div class="brand-mark">A</div><div><strong>AgentHub</strong><small>LOCAL WORKSPACE</small></div></div>
+      <button id="newSession" class="new-button"><span>＋</span> 新建任务</button>
+      <div class="side-label">最近任务 <span id="sessionCount">0</span></div>
+      <div id="sessionList" class="session-list"></div>
+      <div class="rail-bottom">
+        <div id="connection" class="connection"><i></i><span>正在连接本机模型…</span></div>
+        <div class="local-note"><span class="lock">⌑</span><span>本地运行 · 私有上下文<br>会话保存在这台电脑</span></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="crumb"><span>工作台</span><b>/</b><strong id="crumbTitle">准备开始</strong></div>
+        <div class="top-actions"><span id="modelBadge" class="model-badge">本机模型检查中</span><button id="refresh" class="icon-button" title="刷新会话">↻</button></div>
+      </header>
+
+      <section id="welcome" class="welcome">
+        <div class="eyebrow"><span class="pulse"></span> PRIVATE, LOCAL, COLLABORATIVE</div>
+        <h1>让团队，<br><em>把事情做完整。</em></h1>
+        <p>从目标到分工，从独立复核到最终决定。一个清晰、可恢复、由你掌控的本地协作流程。</p>
+        <button id="welcomeNew" class="primary large">＋　创建一个任务</button>
+        <div class="role-strip">
+          <div><span class="role-icon planner-icon">01</span><span><b>执行</b><small>规划、分工、逐步推进</small></span></div>
+          <div><span class="role-icon analyst-icon">02</span><span><b>共享上下文</b><small>目标、假设与任务记录</small></span></div>
+          <div><span class="role-icon review-icon">03</span><span><b>改进</b><small>独立审核、按意见修订</small></span></div>
+          <div><span class="role-icon expert-icon">04</span><span><b>由你决定</b><small>检查结果，再通过交付</small></span></div>
+        </div>
+        <div class="welcome-foot">本机 Ollama 驱动　·　串行调度　·　会话与审核记录留在本机</div>
+      </section>
+
+      <section id="workspace" class="workspace hidden">
+        <div class="task-heading">
+          <div><div class="eyebrow"><span class="task-dot"></span> 当前任务</div><h1 id="taskTitle">任务标题</h1><div class="task-meta"><span id="taskStatus" class="status-pill">待启动</span><span id="taskModel">本机模型</span><span id="taskTime"></span></div></div>
+          <div class="run-actions"><button id="runButton" class="primary">开始执行　→</button><button id="cancelButton" class="secondary hidden">停止运行</button></div>
+        </div>
+        <div class="goal-card"><div class="goal-label">任务上下文 · 目标</div><div id="taskGoal" class="goal-text"></div></div>
+        <div id="workItems" class="work-items hidden"></div>
+        <div class="pipeline-head"><div><h2>团队执行</h2><p>角色依序交接，过程保留在本会话中。</p></div><span id="progressLabel" class="progress-label">等待启动</span></div>
+        <div id="pipeline" class="pipeline"></div>
+        <section class="activity-section"><div class="activity-heading"><h2>上下文与记录</h2><span>代理交接、补充与人工决定</span></div><div id="activityList" class="activity-list"></div></section>
+        <div id="reviewPanel" class="review-panel hidden">
+          <div><span class="review-stamp">改进 · 你的审核</span><h3>这一轮结果可以交付了吗？</h3><p>通过后会标记为已审核；也可以留下修改意见，让团队继续完善。</p></div>
+          <div class="decision-row"><input id="decisionNote" placeholder="要求修改时，写下需要补充或修正的内容"><button id="reviseButton" class="secondary">要求修改</button><button id="approveButton" class="approve">通过审核　✓</button></div>
+        </div>
+        <div id="errorBox" class="error-box hidden"></div>
+        <section class="talk-panel">
+          <div class="talk-title"><div><h2>补充上下文</h2><p>指定一个角色继续讨论，或提供新的约束与修改方向。</p></div><label>发送给 <select id="talkRole"><option value="planner">规划师</option><option value="analyst">分析师</option><option value="specialist">执行专家</option><option value="reviewer">审查员</option><option value="synthesizer">协调员</option></select></label></div>
+          <form id="talkForm" class="talk-form"><textarea id="talkMessage" rows="2" placeholder="追问这个代理，补充约束，或要求它针对审核意见修订…"></textarea><button id="sendTalk" class="primary">发送　↑</button></form>
+        </section>
+        <footer class="privacy-foot"><span class="lock">⌑</span> 对话保存在本机；模型请求只发往 127.0.0.1 上的 Ollama。</footer>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="newDialog" class="new-dialog">
+    <form id="newForm" method="dialog">
+      <div class="dialog-top"><div><span class="eyebrow">NEW TASK</span><h2>从目标开始</h2></div><button type="button" id="closeDialog" class="icon-button">×</button></div>
+      <label class="field-label" for="goalInput">要完成什么？</label>
+      <textarea id="goalInput" required rows="6" placeholder="写下你希望完成的目标、背景与限制。团队会先规划分工，再逐步执行、独立复核并交给你审核。"></textarea>
+      <div class="dialog-bottom"><label class="model-select">使用模型 <select id="modelSelect"><option value="">自动选择本机模型</option></select></label><button type="submit" class="primary">创建会话　→</button></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
