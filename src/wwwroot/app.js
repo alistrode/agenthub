@@ -28,3 +28,137 @@ $('#cancelButton').onclick=async()=>{try{await api(`/api/sessions/${state.curren
 $('#approveButton').onclick=()=>decide('approve');$('#reviseButton').onclick=()=>decide('revise');async function decide(decision){try{const s=await api(`/api/sessions/${state.current.id}/decision`,{method:'POST',body:JSON.stringify({decision,note:$('#decisionNote').value})});selectSession(s,false);$('#decisionNote').value='';toast(decision==='approve'?'已通过审核':'已记录修改意见')}catch(e){toast(e.message)}}
 $('#talkForm').onsubmit=async e=>{e.preventDefault();if(!state.current)return;const message=$('#talkMessage').value.trim();if(!message)return;const btn=$('#sendTalk');btn.disabled=true;btn.textContent='思考中…';try{const s=await api(`/api/sessions/${state.current.id}/talk`,{method:'POST',body:JSON.stringify({role:$('#talkRole').value,message})});$('#talkMessage').value='';selectSession(s,false);await refreshSessions()}catch(err){toast(err.message)}finally{btn.disabled=false;btn.textContent='发送　↑'}};
 (async()=>{await refreshStatus();await refreshSessions();if(state.sessions.length)selectSession(state.sessions[0],false)})();
+
+/* ==================== 模型一键配置（自动注入） ==================== */
+(function () {
+  if (window.__modelSetupMounted) return;
+  window.__modelSetupMounted = true;
+
+  var css = document.createElement('style');
+  css.textContent = [
+    '#msetup{position:fixed;right:16px;bottom:16px;z-index:9999;background:#153a35;color:#eaf4f1;',
+    'border-radius:12px;padding:12px 14px;min-width:280px;max-width:340px;',
+    'box-shadow:0 8px 28px rgba(0,0,0,.28);font:13px/1.55 system-ui,"Segoe UI",sans-serif}',
+    '#msetup .ms-title{font-weight:600;margin-bottom:6px}',
+    '#msetup .ms-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}',
+    '#msetup .ms-state{opacity:.88}',
+    '#msetup button{background:#2ea88a;color:#fff;border:0;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer}',
+    '#msetup button:disabled{opacity:.55;cursor:default}',
+    '#msetup .ms-bar{height:8px;border-radius:6px;background:rgba(255,255,255,.18);overflow:hidden}',
+    '#msetup .ms-bar > i{display:block;height:100%;width:0;background:#4dd0aa;transition:width .25s}',
+    '#msetup .ms-text{font-size:12px;opacity:.82;margin-top:6px;word-break:break-all}',
+    '#msetup .ms-err{color:#ffb4a8}'
+  ].join('');
+
+  function mount() {
+    if (document.getElementById('msetup')) return;
+    document.head.appendChild(css);
+
+    var box = document.createElement('div');
+    box.id = 'msetup';
+    box.innerHTML =
+      '<div class="ms-title">本地模型</div>' +
+      '<div class="ms-row"><span class="ms-state">检测中…</span></div>' +
+      '<div class="ms-row"><button type="button">一键配置</button></div>' +
+      '<div class="ms-prog" hidden><div class="ms-bar"><i></i></div><div class="ms-text"></div></div>';
+    document.body.appendChild(box);
+
+    var stateEl = box.querySelector('.ms-state');
+    var btn = box.querySelector('button');
+    var prog = box.querySelector('.ms-prog');
+    var bar = box.querySelector('.ms-bar > i');
+    var text = box.querySelector('.ms-text');
+    var es = null;
+
+    function pct(s) {
+      if (!s.total || s.total <= 0) return null;
+      return Math.max(0, Math.min(100, Math.round(s.completed * 100 / s.total)));
+    }
+
+    function mb(v) { return (v / 1048576).toFixed(0); }
+
+    function render(s) {
+      if (s.ready) {
+        stateEl.textContent = '● 已就绪（' + s.model + '）';
+        btn.hidden = true;
+        prog.hidden = true;
+        if (es) { es.close(); es = null; }
+        return;
+      }
+      btn.hidden = false;
+
+      if (s.running) {
+        btn.disabled = true;
+        btn.textContent = '配置中…';
+        prog.hidden = false;
+        var p = pct(s);
+        bar.style.width = (p === null ? 100 : p) + '%';
+        bar.style.opacity = (p === null ? 0.35 : 1);
+        var label = s.status || '处理中';
+        if (p !== null) label += '　' + p + '%　' + mb(s.completed) + ' / ' + mb(s.total) + ' MB';
+        text.textContent = label;
+        text.className = 'ms-text';
+        return;
+      }
+
+      if (s.phase === 'error') {
+        btn.disabled = false;
+        btn.textContent = '重试';
+        prog.hidden = false;
+        bar.style.width = '100%';
+        bar.style.opacity = 0.25;
+        text.textContent = s.error || '配置失败';
+        text.className = 'ms-text ms-err';
+        if (es) { es.close(); es = null; }
+        return;
+      }
+
+      btn.disabled = false;
+      btn.textContent = '一键配置';
+      prog.hidden = true;
+      stateEl.textContent = s.ollamaRunning ? '● 未安装模型' : '● Ollama 未运行（将自动启动）';
+    }
+
+    function poll() {
+      fetch('/api/setup/state').then(function (r) { return r.json(); }).then(render).catch(function () { });
+    }
+
+    function listen() {
+      if (es) { es.close(); es = null; }
+      es = new EventSource('/api/setup/progress');
+      es.onmessage = function (ev) {
+        try {
+          var s = JSON.parse(ev.data);
+          render(s);
+          if (!s.running) { es.close(); es = null; }
+        } catch (e) { }
+      };
+      es.onerror = function () { if (es) { es.close(); es = null; } };
+    }
+
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      btn.textContent = '配置中…';
+      prog.hidden = false;
+      bar.style.width = '0%';
+      bar.style.opacity = 1;
+      text.textContent = '正在启动…';
+      text.className = 'ms-text';
+      stateEl.textContent = '● 配置中';
+      fetch('/api/setup/ensure-model', { method: 'POST' })
+        .then(function () { listen(); })
+        .catch(function (e) {
+          btn.disabled = false;
+          btn.textContent = '重试';
+          text.textContent = '请求失败：' + e.message;
+          text.className = 'ms-text ms-err';
+        });
+    });
+
+    poll();
+    setInterval(function () { if (!es && !btn.disabled) poll(); }, 5000);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
+  else mount();
+})();
