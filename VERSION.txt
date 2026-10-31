@@ -1,7 +1,8 @@
 ﻿Product: AgentHub
-Version: 1.1.0
+Version: 1.2.0
 Build date: 2026-10-31
 Target framework: .NET 10.0
 Bundled runtime: .NET 10.0.12
 Architecture: Windows x64
-Startup: Start.cmd（双击，等同 start.ps1）
+Startup: Start.cmd
+Changes: Start.cmd 双击启动；MODELS.md 更正为不绑定具体模型

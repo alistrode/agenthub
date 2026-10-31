@@ -1,6 +1,6 @@
 ﻿# AgentHub 模型下载清单
 
-AgentHub 不打包模型。它取 Ollama `/api/tags` 返回的**第一个**模型，所以本机装哪个就用哪个；没有模型时会提示「先在本机 Ollama 安装一个模型」。
+AgentHub 不打包模型，也不绑定具体模型：它取 Ollama `/api/tags` 返回的**第一个**模型。本机装什么就用什么。
 
 ## 1. 通用前提：本机 Ollama
 
@@ -13,51 +13,36 @@ ollama list       # 确认已安装的模型
 
 Ollama 下载：<https://ollama.com/download>
 
-## 2. 官方模型（可直接拉取）
+## 2. 本项目不绑定任何特定模型
+
+源码里**没有写死任何模型名**：
+
+- 取模型的方式是读 Ollama 的 `/api/tags`，拿**第一个**可用模型；或由界面从列表里选。
+- 所以本机装什么就用什么，装什么名字都行。
+
+**最低要求只有两条**：Ollama 在跑、至少装了 1 个对话模型。
+
+## 3. 推荐的官方模型（任选其一，可直接拉取）
 
 | 模型 | 拉取命令 | 体积 | 说明 |
 |---|---|---|---|
-| `qwen3-vl:4b` | `ollama pull qwen3-vl:4b` | 约 2.8 GB | **推荐首选**，支持图像输入，本项目出厂默认 |
-| `qwen3:1.7b` | `ollama pull qwen3:1.7b` | 约 1.4 GB | 轻量替代，纯 CPU 也能跑 |
+| `qwen3-vl:4b` | `ollama pull qwen3-vl:4b` | 约 2.8 GB | 支持图像输入；PromptLab 界面默认选它 |
+| `qwen3:1.7b` | `ollama pull qwen3:1.7b` | 约 1.4 GB | 轻量，纯 CPU 也能跑 |
 
-只需要装**至少一个**，程序取 `/api/tags` 返回的第一个可用模型。
-
-## 3. 本机原有的三个自建模型（可选，pull 不到）
-
-`news-editor`、`news-editor-light`、`news-qwen` **不是 ollama.com 上的公开模型**，
-是本地用 GGUF + 自定义参数层创建的，`ollama pull` 拉不到。要复现必须自备 GGUF 再写 Modelfile。
-
-| 模型名 | 底座 | 模型文件 | 参数层 |
-|---|---|---|---|
-| `news-editor` | Qwen3 1.7B Instruct | 1749.4 MB | `num_ctx 4096`、`num_gpu 0`、`num_thread 4`、`temperature 0.3`、`use_mmap true` |
-| `news-editor-light` | Qwen3 1.7B Instruct | 1056.1 MB | 同上 |
-| `news-qwen` | Qwen3 0.6B Instruct | 609.8 MB | `num_ctx 4096`、`temperature 0.2` |
-
-重建示例：
-
-```
-# Modelfile
-FROM ./Qwen3-1.7B-Q8_0.gguf
-PARAMETER num_ctx 4096
-PARAMETER num_gpu 0
-PARAMETER num_thread 4
-PARAMETER temperature 0.3
-PARAMETER use_mmap true
-```
-
-```powershell
-ollama create news-editor -f Modelfile
-```
-
-注意 `num_gpu 0` 是刻意设定：纯 CPU、限 4 线程，不抢显存，6 GB 显存的机器也能跑。
-代价是慢，且 `num_ctx 4096` 装不下长输入。
+两个都在 ollama.com 官方库（`HTTP 200` 可查）。装任一个即可。
 
 ## 4. 没有模型会怎样
 
 | 情况 | 表现 |
 |---|---|
-| Ollama 没启动 | 健康检查仍通过（`/api/health` 不依赖 Ollama），但生成类请求会失败并提示「本机 Ollama 未连接」 |
+| Ollama 没启动 | 健康检查仍通过（`/api/health` 不依赖 Ollama），但生成类请求失败并提示「本机 Ollama 未连接」 |
 | Ollama 在跑但没有模型 | 提示「先在本机 Ollama 安装一个模型」 |
-| 装了模型但太小 | 能跑，但输出质量、格式遵从度明显下降，长输入会被 4096 上下文截断 |
+| 装了模型但太小 | 能跑，但输出质量与格式遵从度明显下降；`num_ctx` 只有 4096，长输入会被截断 |
 
-**健康接口 200 只代表服务起来了，不代表模型可用。** 界面里的状态区会单独显示 Ollama 连接与模型列表。
+**健康接口 200 只代表服务起来了，不代表模型可用。** 界面状态区会单独显示 Ollama 连接与模型列表。
+
+## 5. 常见误解
+
+别的项目里可能见过 `news-editor` / `news-editor-light` / `news-qwen` 这三个名字。
+它们是**另一套新闻流水线**里本地自建的模型（ollama.com 查不到，`pull` 拉不到），
+**与本项目无关**，不需要安装，装了也不会被特别选中。
